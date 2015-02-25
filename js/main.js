@@ -22,16 +22,19 @@ window.onload = function() {
         game.load.image( 'traffic', 'assets/Car.png');
         
         // loads sound
-        game.load.audio( 'castSound', 'assets/magicshot.mp3');
-        game.load.audio( 'backgroundMusic', 'assets/AnimalCrossing-TownHall.ogg');
+        game.load.audio( 'backgroundMusic', 'assets/BedoBedo.ogg');
     }
     
     //background image
     var world;
     
-    //player and monster sprites
+    //player sprite
     var player;
+    
+    //enemy sprites and enemy generation
     var enemies;
+    var enemyTimer = 1500;
+    var nextEnemy = 0;
     
     //timer of the game
     var timer;
@@ -57,7 +60,6 @@ window.onload = function() {
     var cursors;
     
     //sounds
-    var fx;
     var music;
     
     function create() {
@@ -93,7 +95,6 @@ window.onload = function() {
         cursors = game.input.keyboard.createCursorKeys();
         
         // Adds sound
-        fx = game.add.audio('castSound');
         music = game.add.audio('backgroundMusic', 1, true);
         music.play('', 0, 1, true);
         
@@ -113,10 +114,6 @@ window.onload = function() {
         
         //initializes player speed
         playerVelocity = 0;
-    }
-    
-    function createEnemies()
-    {
     }
     
     function update() {
@@ -148,8 +145,12 @@ window.onload = function() {
             player.body.velocity.y = 150;
         }
         
+        //creates enemies (flying traffic ugh)
+        createEnemy();
+        
         //now to check enemies
         game.physics.arcade.overlap(enemies, player, monsterHandler, null, this);
+        enemies.forEachAlive(updateEnemies, this);
         
         //updates timer
         if(timerActive)
@@ -171,8 +172,31 @@ window.onload = function() {
         //updates score
         if(isAlive)
             score += playerVelocity;
-        if(score >= 2000000)
+        if(score >= 2500000)
             victory();
+    }
+    
+    function createEnemy() {
+        if (game.time.now > nextEnemy && enemies.countDead() > 0)
+        {
+            nextEnemy = game.time.now + enemyTimer;
+
+            var enemy = enemies.getFirstExists(false);
+
+            enemy.reset(850, (game.rnd.integer() % 5 + 1) * 100);
+
+            enemy.body.velocity.x = 200 - playerVelocity;
+            
+            if(score > 1000000)
+                enemyTimer = 800;
+            if(score > 2000000)
+                enemyTimer = 500;
+        }
+    }
+    
+    function updateEnemies(enemy)
+    {
+        enemy.body.velocity.x = 200 - playerVelocity;
     }
     
     function monsterHandler(player, enemy)
@@ -206,6 +230,7 @@ window.onload = function() {
     }
     
     function render() {
-        game.debug.text("Progress: " + parseInt(score/20000) + "%", 20, 580);
+        game.debug.text("Progress: " + parseInt(score/25000) + "%", 20, 570);
+        game.debug.text("Lives: " + lives, 20, 590);
     }
 };
