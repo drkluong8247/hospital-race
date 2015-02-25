@@ -17,10 +17,9 @@ window.onload = function() {
     
     function preload() {
         // Loads images
-        game.load.image( 'world', 'assets/ForestBackground.png' );
-        game.load.image( 'wizard', 'assets/Mage.png');
-        game.load.image( 'monster', 'assets/Specter.png');
-        game.load.image( 'magic', 'assets/Boltshot.png');
+        game.load.image( 'world', 'assets/SkyRoadBackground.png' );
+        game.load.image( 'ambulance', 'assets/Ambulance.png');
+        game.load.image( 'traffic', 'assets/Car.png');
         
         // loads sound
         game.load.audio( 'castSound', 'assets/magicshot.mp3');
@@ -34,10 +33,22 @@ window.onload = function() {
     var player;
     var enemies;
     
+    //timer of the game
+    var timer;
+    var timerText;
+    var timerStyle;
+    var minutes;
+    var seconds;
+    var timerActive = true;
+    
+    //player movement
+    var playerVelocity;
+    
     //player's current score
     var score;
     
     //game over message (and player death)
+    var lives;
     var lost;
     var style;
     var isAlive;
@@ -49,28 +60,12 @@ window.onload = function() {
     var fx;
     var music;
     
-    //related to firing
-    var bolts;
-    var nextFire = 0;
-    var fireRate = 300;
-    
-    //controls the player's blank periods
-    var blank = true;
-    var blankCount;
-    var blankDuration;
-    var blankCoolDown;
-    
     function create() {
         game.physics.startSystem(Phaser.Physics.ARCADE);
         
         // creates background, player, and monsters
         world = game.add.tileSprite(0, 0, 800, 600, 'world');
-        player = game.add.sprite( game.world.centerX, game.world.centerY, 'wizard' );
-        
-        enemies = game.add.group();
-        enemies.enableBody = true;
-        enemies.physicsBodyType = Phaser.Physics.ARCADE;
-        createEnemies();
+        player = game.add.sprite( game.world.centerX, game.world.centerY, 'ambulance' );
         
         
         // Create a sprite at the center of the screen using the 'logo' image.
@@ -84,15 +79,15 @@ window.onload = function() {
         player.body.collideWorldBounds = true;
         
         
-        // adds magic bolts
-        bolts = game.add.group();
-        bolts.enableBody = true;
-        bolts.physicsBodyType = Phaser.Physics.ARCADE;
-        bolts.createMultiple(30, 'magic', 0, false);
-        bolts.setAll('anchor.x', 0.5);
-        bolts.setAll('anchor.y', 0.5);
-        bolts.setAll('outOfBoundsKill', true);
-        bolts.setAll('checkWorldBounds', true);
+        // adds traffic
+        enemies = game.add.group();
+        enemies.enableBody = true;
+        enemies.physicsBodyType = Phaser.Physics.ARCADE;
+        enemies.createMultiple(10, 'traffic', 0, false);
+        enemies.setAll('anchor.x', 0.5);
+        enemies.setAll('anchor.y', 0.5);
+        enemies.setAll('outOfBoundsKill', true);
+        enemies.setAll('checkWorldBounds', true);
         
         // Player controls
         cursors = game.input.keyboard.createCursorKeys();
@@ -102,47 +97,48 @@ window.onload = function() {
         music = game.add.audio('backgroundMusic', 1, true);
         music.play('', 0, 1, true);
         
-        // player's blank moment parameters(initial)
-        blankCount = 0;
-        blankDuration = 200;
-        blankCoolDown = blankDuration + 500;
+        //initializes timer
+        timer = game.time.now+120000;
+        timerStyle = { font: "40px Arial", fill: "#000000", align: "center" }
+        timerText = game.add.text(game.world.centerX, 30, "2:00", timerStyle);
+        timerText.anchor.setTo(0.5, 0.5);
         
-        //initializes score and player's 1 life
+        //initializes score and player's lives
+        lives = 3;
         score = 0;
         isAlive = true;
         
         //creates game over
         style = { font: "65px Arial", fill: "#ff0044", align: "center" };
+        
+        //initializes player speed
+        playerVelocity = 0;
     }
     
     function createEnemies()
     {
-        //modified from Invaders
-        for(var y = 0; y < 20; y++)
-        {
-            var enemy = enemies.create(10, 10, 'monster');
-            enemy.anchor.setTo(0.5, 0.5);
-            enemy.body.bounce.set(1);
-            enemy.body.velocity.x = game.rnd.integer() % 200;
-            enemy.body.velocity.y = game.rnd.integer() % 200;
-            enemy.body.collideWorldBounds = true;
-        }
-        
-        enemies.x = 50;
-        enemies.y = 50;
     }
     
     function update() {
+        world.tilePosition.x -= parseInt(playerVelocity/50);
         // Controls movement of the player
         player.body.velocity.setTo(0, 0);
         if (cursors.left.isDown)
         {
-            player.body.velocity.x = -150;
+            playerVelocity -= 30;
+            if(playerVelocity < 0) playerVelocity = 0;
         }
         else if (cursors.right.isDown)
         {
-            player.body.velocity.x = 150;
+            playerVelocity += 30;
+            if(playerVelocity > 600) playerVelocity = 600;
         }
+        else
+        {
+            playerVelocity -= 5;
+            if(playerVelocity < 0) playerVelocity = 0;
+        }
+            
         if (cursors.up.isDown)
         {
             player.body.velocity.y = -150;
@@ -152,94 +148,64 @@ window.onload = function() {
             player.body.velocity.y = 150;
         }
         
-        //controls when the player blanks out
-        blankCount += 1;
-        if((blank) && (blankCount > blankDuration))
-        {
-            blank = false;
-        }
+        //now to check enemies
+        game.physics.arcade.overlap(enemies, player, monsterHandler, null, this);
         
-        if(blankCount > blankCoolDown)
+        //updates timer
+        if(timerActive)
         {
-            blankCount = 0;
-            blank = true;
-            blankDuration = game.rnd.integer() % 200 + 200;
-            blankCoolDown = game.rnd.integer() % 500 + 500;
-        }
-        
-        //controls player firing
-        if ((game.input.activePointer.isDown) && isAlive)
-        {
-            //  now to check if you're suffering from amnesia
-            if(!blank)
+            var timeLeft = timer - game.time.now;
+            minutes = parseInt(timeLeft)/60000;
+            seconds = (parseInt(timeLeft)/1000) % 60;
+            if(seconds >= 10)
+                timerText.setText(parseInt(minutes) + ":" + parseInt(seconds));
+            else
+                timerText.setText(parseInt(minutes) + ":0" + parseInt(seconds));
+
+            if((timeLeft <= 0) && isAlive)
             {
-                castMagic();
+                defeat();
             }
         }
         
-        //now to check enemies
-        game.physics.arcade.overlap(bolts, enemies, magicHandler, null, this);
-        game.physics.arcade.overlap(enemies, player, monsterHandler, null, this);
-        
-        //revives enemies if all are dead (ALL AT ONCE!)
-        if(!enemies.getFirstAlive())
-        {
-            startWave();
-        }
-    }
-    
-    function castMagic() {
-        if (game.time.now > nextFire && bolts.countDead() > 0)
-        {
-            nextFire = game.time.now + fireRate;
-
-            var bolt = bolts.getFirstExists(false);
-
-            bolt.reset(player.x, player.y);
-
-            bolt.rotation = game.physics.arcade.moveToPointer(bolt, 1000, game.input.activePointer, 500);
-            
-            fx.play();
-        }
-    }
-    
-    function magicHandler (enemy, bolt) {
-
-        bolt.kill();
-        enemy.kill();
-        score += 20;
+        //updates score
+        if(isAlive)
+            score += playerVelocity;
+        if(score >= 2000000)
+            victory();
     }
     
     function monsterHandler(player, enemy)
     {
+        enemy.kill();
+        lives -= 1;
+        if(lives <= 0)
+        {
+            defeat();
+        }   
+    }
+    
+    //if player wins
+    function victory()
+    {
         player.kill();
         isAlive = false;
-        lost = game.add.text(game.world.centerX, game.world.centerY, "GAME OVER!", style);
+        timerActive = false;
+        lost = game.add.text(game.world.centerX, game.world.centerY, "You made it!", style);
         lost.anchor.setTo( 0.5, 0.5);
     }
     
-    function startWave()
+    //if player loses
+    function defeat()
     {
-        var resurrect = enemies.getFirstDead();
-        
-        while(resurrect)
-        {
-            resurrect.reset(0, 0);
-            resurrect.body.velocity.x = game.rnd.integer() % 200;
-            resurrect.body.velocity.y = game.rnd.integer() % 200;
-            resurrect = enemies.getFirstDead();
-        }
+        player.kill();
+        isAlive = false;
+        timerActive = false;
+        lost = game.add.text(game.world.centerX, game.world.centerY, "You didn't make it...", style);
+        lost.anchor.setTo( 0.5, 0.5);
     }
     
-    
     function render() {
-
-        // notifys you about when you are blanking or not
-        if(blank)
-            game.debug.text('Wait, how do I cast spells again?', 32, 32);
-        else
-            game.debug.text('Oh, now I remember! Prepare to die monsters!', 32, 32)
-            
-        game.debug.text('Score: ' + score, 32, 580);
+        game.debug.text("Progress: " + parseInt(score/20000) + "%", 20, 580);
     }
 };
